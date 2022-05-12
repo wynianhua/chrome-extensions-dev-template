@@ -1,138 +1,173 @@
-/* eslint-disable no-unused-vars */
-const loadBtn = document.getElementById('load-btn');
-const addBtn = document.getElementById('add-btn');
-const form = document.getElementById('form');
-const linkp = document.getElementById('link-show');
-const reminder = document.getElementById('reminder');
-const loadContainer = document.getElementById('load-container');
+function init () {
+  $(document).ready(function () {
+    getIsHuiduByCookies()
+      .then((res) => {
+        console.log('是不是灰度', res)
+        if (res) {
+          $('#huidu').addClass('active')
+        } else {
+          $('#huidu').removeClass('active')
+        }
+      })
 
-// storage 缓存键
-const CACHED_KEY = '__wukongCache';
-let link = '';
-// 项目初始化，绑定相关事件
-const init = () => {
-  chrome.tabs.getSelected(null, (tab) => {　　// 先获取当前页面的tabID
-    const { url } = tab;
-    link = url;
-    linkp.innerText = url;
-  });
-  initInSavePage(link);
-};
+    getIsDevStatus()
+      .then(res => {
+        console.log('是不是调试', res)
+        if (res) {
+          $('#dev').addClass('active')
+        } else {
+          $('#dev').removeClass('active')
+        }
+      })
 
-// 保存链接
-function saveLink() {
-  // 命名字段
-  const hostName = form.hostValue.value;
-  const pathName = form.pathValue.value;
-  const queryName = form.queryValue.value;
-  if (!hostName && !pathName && !queryName) {
-    reminder.innerText = '参数不能全部为空!';
-    reminder.style.color = 'red';
-    return;
+    $('#huidu').click(function () {
+      if ($(this).hasClass('active')) {
+        $('#huidu').removeClass('active')
+        removeHuiduCookies()
+      } else {
+        $('#huidu').addClass('active')
+        setHuiDuCookies()
+      }
+    })
+
+    $('#dev').click(function () {
+      if ($(this).hasClass('active')) {
+        setDevStatus(false)
+        $('#dev').removeClass('active')
+      } else {
+        $('#dev').addClass('active')
+        setDevStatus(true)
+        sendHideZhidaElementMsg()
+      }
+    })
+  })
+}
+
+
+function getIsDevStatus () {
+  return new Promise(resolve => {
+    chrome.storage.sync.get(['isDev'], function (result) {
+      resolve(result.isDev)
+    })
+  })
+}
+
+async function getIsHuiduByCookies() {
+  let cookie1
+  let cookie2
+  const p1 = function () {
+    return new Promise (resolve => {
+      const params = {
+        url: 'https://b.pingan.com.cn',
+        name: 'x-g-route-group'
+      }
+      chrome.cookies.get(
+        params,
+        function (data) {
+          cookie1 = data
+          resolve()
+        }
+      )
+    })
   }
-  // 链接字段值
-  const [href, query = ''] = link.split('?');
-  const args = href.split('/');
-  const host = args.slice(0, 3).join('/');
-  const path = args.slice(3).join('/');
-
-  chrome.storage.sync.get([CACHED_KEY], (result) => {
-    const json = result[CACHED_KEY] || {};
-    const { hostMap = {}, pathMap = {}, queryMap = {} } = json;
-    if (hostName) hostMap[host] = hostName;
-    if (pathName) pathMap[path] = pathName;
-    if (queryName) queryMap[query] = queryName;
-
-    json.hostMap = hostMap;
-    json.pathMap = pathMap;
-    json.queryMap = queryMap;
-    chrome.storage.sync.set({ [CACHED_KEY]: json });
-    reminder.innerText = '保存成功!';
-    reminder.style.color = 'green';
-    setTimeout(() => {
-      reminder.innerText = '';
-    }, 2000);
-  });
-}
-
-// 加载记录列表
-function loadStored() {
-  let count = 0;
-  const childrenWrapper = (key, value, name) => {
-    const id = name + count;
-    count += 1;
-    return `<li><input class="radio" type="radio" id=${id} name=${name} value=${key}><label for=${id}>${value}</label></input></li>`;
-  };
-  chrome.storage.sync.get(['__wukongCache'], (result) => {
-    const hostContainer = document.getElementById('host-list');
-    const pathContainer = document.getElementById('path-list');
-    const queryContainer = document.getElementById('query-list');
-    const { __wukongCache = {} } = result;
-    const { hostMap = {}, pathMap = {}, queryMap = {} } = __wukongCache;
-    let hostHtml = '';
-    let pathHtml = '';
-    let queryHtml = '';
-    Object.keys(hostMap).forEach((hostKey) => {
-      hostHtml += childrenWrapper(hostKey, hostMap[hostKey], 'hostValue');
-    });
-    Object.keys(pathMap).forEach((pathKey) => {
-      pathHtml += childrenWrapper(pathKey, pathMap[pathKey], 'pathValue');
-    });
-    Object.keys(queryMap).forEach((querykey) => {
-      queryHtml += childrenWrapper(querykey, queryMap[querykey], 'queryValue');
-    });
-    hostContainer.innerHTML = `${hostHtml}`;
-    pathContainer.innerHTML = `${pathHtml}`;
-    queryContainer.innerHTML = `${queryHtml}`;
-
-    initInListPage();
-  });
-}
-
-// 页面加载
-function loadPage() {
-  const getCheckdValue = (name) => {
-    const radios = document.getElementsByName(name);
-    for (let i = 0; i < radios.length; i++) {
-      if (radios[i].checked) return radios[i].value;
-    }
-  };
-  const hostValue = getCheckdValue('hostValue');
-  const pathValue = getCheckdValue('pathValue');
-  const queryValue = getCheckdValue('queryValue');
-  if (!hostValue) {
-    reminder.style.color = 'red';
-    reminder.innerText = '请选择域名!';
-    return;
+  const p2 = function () {
+    return new Promise(resolve => {
+      const params = {
+        url: 'https://cdn.sdb.com.cn/',
+        name: 'x-g-route-group'
+      }
+      chrome.cookies.get(
+        params,
+        function (data) {
+          cookie2 = data
+          resolve()
+        }
+      )
+    })
   }
-  let link = hostValue;
-  if (pathValue) link += `/${pathValue}`;
-  if (queryValue) link += `?${queryValue}`;
-  window.open(link);
+  await Promise.all([
+    p1(),
+    p2()
+  ])
+  const res = [cookie1, cookie2]
+  console.log('灰度 cookie', res)
+  return res.every(item => {
+    return item?.value === 'always'
+  })
 }
 
-// 编辑页事件绑定
-function initInSavePage() {
-  reminder.innerText = '';
-  addBtn.innerText = '保存';
-  loadBtn.innerText = '访问';
-  form.style.display = 'block';
-  loadContainer.style.display = 'none';
-  linkp.style.display = 'block';
-  loadBtn.onclick = loadStored;
-  addBtn.onclick = saveLink;
+function setHuiDuCookies(data) {
+  const params1 = {
+    domain: '.sdb.com.cn',
+    httpOnly: false,
+    name: 'x-g-route-group',
+    path: '/',
+    sameSite: 'unspecified',
+    secure: true,
+    storeId: '0',
+    value: 'always',
+    url: 'https://cdn.sdb.com.cn/'
+  }
+  const params2 = {
+    domain: '.pingan.com.cn',
+    httpOnly: false,
+    name: 'x-g-route-group',
+    path: '/',
+    sameSite: 'unspecified',
+    secure: true,
+    storeId: '0',
+    value: 'always',
+    url: 'https://b.pingan.com.cn/'
+  }
+  console.log('params ==>', JSON.stringify(params1, null, 2))
+  console.log('params ==>', JSON.stringify(params2, null, 2))
+  chrome.cookies.set(
+    params1,
+    function () {
+      console.log('cdn.sdb.com.cn 设置成功')
+    },
+  )
+  chrome.cookies.set(
+    params2,
+    function () {
+      console.log('.pingan.com.cn 设置成功')
+    },
+  )
 }
 
-// 列表页事件绑定
-function initInListPage() {
-  reminder.innerText = '';
-  addBtn.innerText = '返回';
-  loadBtn.innerText = '打开';
-  form.style.display = 'none';
-  loadContainer.style.display = 'block';
-  linkp.style.display = 'none';
-  loadBtn.onclick = loadPage;
-  addBtn.onclick = initInSavePage;
+function removeHuiduCookies () {
+  const params1 = {
+    name: 'x-g-route-group',
+    url: 'https://b.pingan.com.cn/'
+  }
+  const params2 = {
+    name: 'x-g-route-group',
+    url: 'https://cdn.sdb.com.cn/'
+  }
+  console.log('params ==>', JSON.stringify(params1, null, 2))
+  console.log('params ==>', JSON.stringify(params2, null, 2))
+  chrome.cookies.remove(params1)
+  chrome.cookies.remove(params2)
 }
 
-init();
+function sendHideZhidaElementMsg () {
+  chrome.tabs.getSelected(null, function (tab) {
+    console.log('cerrent tab', tab)
+    chrome.tabs.sendMessage(tab.id, {
+      isDev: true
+    }, function (response) {
+      console.log('chrome.tabs.sendMessage', response)
+    });
+  });
+}
+
+function setDevStatus(bool) {
+  chrome.storage.sync.set({
+    isDev: bool
+  },
+  function () {
+    console.log('isDev is set to ' + bool)
+  })
+}
+
+init()
