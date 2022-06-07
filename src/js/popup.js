@@ -9,7 +9,7 @@ function init () {
           $('#huidu').removeClass('active')
         }
       })
-
+    
     getIsDevStatus()
       .then(res => {
         console.log('是不是调试', res)
@@ -19,6 +19,27 @@ function init () {
           $('#dev').removeClass('active')
         }
       })
+    
+    getIsCdnHuiDuStatus()
+      .then(res => {
+        console.log('是不是 cdnjs 灰度', res)
+        if (res) {
+          $('#cdn-huidu').addClass('active')
+        } else {
+          $('#cdn-huidu').removeClass('active')
+        }
+      })
+
+        
+    $('#cdn-huidu').click(function () {
+      if ($(this).hasClass('active')) {
+        $('#cdn-huidu').removeClass('active')
+        setIsCdnHuiDuStatus(false)
+      } else {
+        $('#cdn-huidu').addClass('active')
+        setIsCdnHuiDuStatus(true)
+      }
+    })
 
     $('#huidu').click(function () {
       if ($(this).hasClass('active')) {
@@ -48,6 +69,14 @@ function getIsDevStatus () {
   return new Promise(resolve => {
     chrome.storage.sync.get(['isDev'], function (result) {
       resolve(result.isDev)
+    })
+  })
+}
+
+function getIsCdnHuiDuStatus() {
+  return new Promise(resolve => {
+    chrome.storage.sync.get(['isCdnHuiDu'], function (result) {
+      resolve(result.isCdnHuiDu)
     })
   })
 }
@@ -170,4 +199,15 @@ function setDevStatus(bool) {
   })
 }
 
+function setIsCdnHuiDuStatus(bool) {
+  chrome.storage.sync.set({
+      isCdnHuiDu: bool
+    },
+    function () {
+      console.log('isCdnHuiDu is set to ' + bool)
+    })
+}
+
 init()
+
+
